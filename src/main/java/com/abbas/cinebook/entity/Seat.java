@@ -2,7 +2,11 @@ package com.abbas.cinebook.entity;
 
 import java.util.List;
 
+import com.abbas.cinebook.enums.SeatType;
+
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -21,12 +25,14 @@ public class Seat {
     private int id;
 
     private String seatNumber;
-    private String seatType;
+    
+    @Enumerated(EnumType.STRING)
+    private SeatType seatType;
 
     @ManyToOne 
     @JoinColumn(name = "screen_id")
     private Screen screen;
 
     @OneToMany(mappedBy = "seat")
-List<BookingSeat> bookingSeats;
+    List<BookingSeat> bookingSeats;
 }

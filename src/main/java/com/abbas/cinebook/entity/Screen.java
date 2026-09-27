@@ -20,7 +20,8 @@ public class Screen {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     int id;
 
-    private int screen_number;
+    private int screenNumber;
+    private int totalSeats;
     
     @ManyToOne 
     @JoinColumn(name = "theater_id")
