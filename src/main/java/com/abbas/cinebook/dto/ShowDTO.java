@@ -1,5 +1,7 @@
 package com.abbas.cinebook.dto;
 
+import java.time.LocalDateTime;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -7,7 +9,7 @@ import lombok.Setter;
 @Setter 
 public class ShowDTO {
 
-    private String showTime;
+    private LocalDateTime showTime;
     private int movieId;
     private int screenId;
 

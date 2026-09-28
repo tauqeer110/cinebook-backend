@@ -1,5 +1,6 @@
 package com.abbas.cinebook.entity;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import jakarta.persistence.Entity;
@@ -22,7 +23,7 @@ public class Show {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    private String showTime;
+    private LocalDateTime showTime;
 
     @ManyToOne
     @JoinColumn(name = "movie_id")
@@ -34,4 +35,7 @@ public class Show {
 
     @OneToMany(mappedBy = "show")
     private List<Booking> bookings;
+
+    @OneToMany(mappedBy = "show")
+    private List<ShowPricing> showPricing;
 }
