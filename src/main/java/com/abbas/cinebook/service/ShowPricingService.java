@@ -1,13 +1,9 @@
 package com.abbas.cinebook.service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import com.abbas.cinebook.dto.SeatPriceDTO;
 import com.abbas.cinebook.dto.ShowPricingRequestDTO;
 import com.abbas.cinebook.dto.ShowPricingResponseDTO;
 import com.abbas.cinebook.entity.Show;
@@ -63,6 +59,6 @@ public class ShowPricingService {
 
                 return response;
             })
-            .collect(Collectors.toList());
+            .toList();
     }
 }

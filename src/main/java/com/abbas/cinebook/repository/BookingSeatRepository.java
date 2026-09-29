@@ -4,6 +4,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.abbas.cinebook.entity.BookingSeat;
 
 public interface BookingSeatRepository extends JpaRepository<BookingSeat, Integer> {
-
-    
+    boolean existsBySeatIdAndBooking_ShowId(int seatId, int showId);
 } 

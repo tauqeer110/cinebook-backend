@@ -38,7 +38,7 @@ public class ShowController {
     @PostMapping("/{showId}/pricing")
     public ResponseEntity<List<ShowPricingResponseDTO>> setShowPrice(@PathVariable int showId, @RequestBody ShowPricingRequestDTO request) {
         List<ShowPricingResponseDTO> response = showPricingService.setShowPrice(showId, request);
-        return ResponseEntity.status(HttpStatus.OK).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     
     
