@@ -1,6 +1,5 @@
 package com.abbas.cinebook.service;
 
-import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.stereotype.Service;
 
 import com.abbas.cinebook.entity.Seat;

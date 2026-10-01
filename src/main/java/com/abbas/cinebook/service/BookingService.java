@@ -38,8 +38,65 @@ public class BookingService {
     private final BookingSeatRepository bookingSeatRepository;
     private final PricingService pricingService;
 
-    public BookingResponseDTO createBooking(BookingRequestDTO dto)
-            throws BadRequestException, ConflictException {
+    public BookingResponseDTO getBooking(int bookingId) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking Does Not Exists"));
+
+        int showId = booking.getShow().getId();
+
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(bookingId);
+        
+        double totalPrice = 0;
+        List<String> seatNumbers = new ArrayList<>();
+
+        for (BookingSeat bookingSeat : bookingSeats) {
+
+            totalPrice += bookingSeat.getPrice();
+            seatNumbers.add(bookingSeat.getSeat().getSeatNumber());
+        }
+
+         
+        return createBookingResponse(
+                booking,
+                showId,
+                totalPrice,
+                seatNumbers
+        );
+    }
+
+    public BookingResponseDTO cancelBooking(int bookingId) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking Does Not Exists"));
+
+        if(booking.getBookingStatus() == BookingStatus.CANCELLED) {
+                throw new ConflictException("Boking has Already Cancelled, Can't cancel Twice");
+        }
+
+        booking.setBookingStatus(BookingStatus.CANCELLED);
+
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(bookingId);
+
+        double totalPrice = 0;
+        List<String> seatNumbers = new ArrayList<>();
+
+        for (BookingSeat bookingSeat : bookingSeats) {
+
+            totalPrice += bookingSeat.getPrice();
+
+            seatNumbers.add(bookingSeat.getSeat().getSeatNumber());
+        }
+
+        return createBookingResponse(
+                booking,
+                booking.getShow().getId(),
+                totalPrice,
+                seatNumbers
+        );
+    }
+
+    public BookingResponseDTO createBooking(BookingRequestDTO dto) {
 
         Show show = getShow(dto.getShowId());
         User user = getUser(dto.getUserId());
@@ -70,7 +127,7 @@ public class BookingService {
 
         return createBookingResponse(
                 booking,
-                show,
+                show.getId(),
                 totalPrice,
                 seatNumbers
         );
@@ -98,8 +155,7 @@ public class BookingService {
 
     private List<Seat> validateAndGetSeats(
             List<Integer> seatIds,
-            Show show)
-            throws BadRequestException, ConflictException {
+            Show show) {
 
         List<Seat> seats = new ArrayList<>();
 
@@ -132,8 +188,7 @@ public class BookingService {
 
     private void validateSeatScreen(
             Seat seat,
-            Show show)
-            throws BadRequestException {
+            Show show) {
 
         if (seat.getScreen().getId() != show.getScreen().getId()) {
 
@@ -146,13 +201,13 @@ public class BookingService {
 
     private void validateSeatAvailability(
             int seatId,
-            Show show)
-            throws ConflictException {
+            Show show) {
 
         boolean isBooked =
-                bookingSeatRepository.existsBySeatIdAndBooking_ShowId(
+                bookingSeatRepository.existsBySeatIdAndBooking_ShowIdAndBooking_BookingStatus (
                         seatId,
-                        show.getId()
+                        show.getId(),
+                        BookingStatus.CONFIRMED
                 );
 
         if (isBooked) {
@@ -193,7 +248,7 @@ public class BookingService {
 
     private BookingResponseDTO createBookingResponse(
             Booking booking,
-            Show show,
+            int showId,
             double totalPrice,
             List<String> seatNumbers) {
 
@@ -203,7 +258,8 @@ public class BookingService {
                 booking.getBookingStatus()
         );
 
-        response.setShowId(show.getId());
+        response.setBookingId(booking.getId());
+        response.setShowId(showId);
         response.setTotalPrice(totalPrice);
         response.setSeatNumbers(seatNumbers);
 

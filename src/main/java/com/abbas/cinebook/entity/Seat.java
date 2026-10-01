@@ -22,7 +22,7 @@ public class Seat {
     private int id;
 
     private String seatNumber;
-    
+
     @Enumerated(EnumType.STRING)
     private SeatType seatType;
 
