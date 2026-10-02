@@ -1,5 +1,8 @@
 package com.abbas.cinebook.service;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 import com.abbas.cinebook.dto.ShowDTO;
@@ -38,13 +41,44 @@ public class ShowService {
 
         Show saved = showRepository.save(show);
 
-        ShowResponseDTO response = new ShowResponseDTO();
-        response.setId(saved.getId());
-        response.setShowTime(saved.getShowTime());
-        response.setMovieTitle(saved.getMovie().getTitle());
-        response.setScreenNumber(saved.getScreen().getScreenNumber());
+        ShowResponseDTO responseDTO = createResponseDTO(saved);
+        
+        return responseDTO;
+    }
 
-        return response;
+    public List<ShowResponseDTO> getShows() {
+
+        List<Show> shows = showRepository.findAll();
+
+        List<ShowResponseDTO> showResponseDTOs = new ArrayList<>();
+
+        for (Show show : shows){
+            ShowResponseDTO responseDTO = createResponseDTO(show);
+            showResponseDTOs.add(responseDTO);
+        }
+
+        return showResponseDTOs;
+    }
+
+    public ShowResponseDTO getShow(int showId) {
+
+        Show show = showRepository.findById(showId)
+                .orElseThrow(() -> new ResourceNotFoundException("Show Does Not Exists With This Id"));
+
+        return createResponseDTO(show);
+    }
+
+    public ShowResponseDTO createResponseDTO(Show show) {
+
+        ShowResponseDTO showResponseDTO = new ShowResponseDTO();
+
+        showResponseDTO.setId(show.getId());
+        showResponseDTO.setShowTime(show.getShowTime());
+        showResponseDTO.setMovieTitle(show.getMovie().getTitle());
+        showResponseDTO.setScreenNumber(show.getScreen().getScreenNumber());
+
+        return showResponseDTO;
+
     }
 
 }

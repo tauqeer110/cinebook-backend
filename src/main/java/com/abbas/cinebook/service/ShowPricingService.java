@@ -22,7 +22,9 @@ public class ShowPricingService {
     private final ShowPricingRepository showPricingRepository;
     
     public List<ShowPricingResponseDTO> setShowPrice(
+        
         int showId,
+        
         ShowPricingRequestDTO showPricingRequestDto) {
 
         Show show = showRepository.findById(showId)

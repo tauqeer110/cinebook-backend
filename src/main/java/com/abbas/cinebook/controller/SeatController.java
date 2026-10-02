@@ -24,7 +24,12 @@ public class SeatController {
 
     @GetMapping("/screens/{screenId}/seats")
     public ResponseEntity<List<SeatResponseDTO>> getAllSeats(@PathVariable int screenId) {
-        List<SeatResponseDTO> response = seatService.getAllSeats(screenId);
-        return ResponseEntity.status(HttpStatus.OK).body(response);
+        
+        List<SeatResponseDTO> response = 
+                seatService.getAllSeats(screenId);
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(response);
     }
 }

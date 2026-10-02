@@ -19,6 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.GetMapping;
+
 
 
 @RestController 
@@ -31,15 +33,46 @@ public class ShowController {
     
     @PostMapping
     public ResponseEntity<ShowResponseDTO> createShow(@RequestBody ShowDTO dto) {
-        ShowResponseDTO response = showService.createShow(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        ShowResponseDTO response = 
+                showService.createShow(dto);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
     }
 
     @PostMapping("/{showId}/pricing")
     public ResponseEntity<List<ShowPricingResponseDTO>> setShowPrice(@PathVariable int showId, @RequestBody ShowPricingRequestDTO request) {
-        List<ShowPricingResponseDTO> response = showPricingService.setShowPrice(showId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+      
+        List<ShowPricingResponseDTO> response = 
+                showPricingService.setShowPrice(showId, request);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
     }
     
+    @GetMapping
+    public ResponseEntity<List<ShowResponseDTO>> getShows() {
+
+        List<ShowResponseDTO> showResponseDTOs = 
+                showService.getShows();
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(showResponseDTOs);
+    }
+
+    @GetMapping("{showId}")
+    public ResponseEntity<ShowResponseDTO> getShows(@PathVariable  int showId) {
+
+        ShowResponseDTO showResponseDTO = 
+                showService.getShow(showId);
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(showResponseDTO);
+    }
     
 }
