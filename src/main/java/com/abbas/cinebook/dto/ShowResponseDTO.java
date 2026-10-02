@@ -1,6 +1,7 @@
 package com.abbas.cinebook.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -12,4 +13,5 @@ public class ShowResponseDTO {
     private LocalDateTime showTime;
     private String movieTitle;
     private int screenNumber;
+    List<SeatPriceDTO> seatPrices;
 }
