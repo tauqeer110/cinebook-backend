@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 @RequestMapping("/api/users")
 public class UserController {
     
-    private UserService userService;
+    private final UserService userService;
 
     @GetMapping("/{userId}/bookings")
     public ResponseEntity<List<BookingResponseDTO>> getMethodName(@PathVariable int userId) {
