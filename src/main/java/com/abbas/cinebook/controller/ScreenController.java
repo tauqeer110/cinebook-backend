@@ -6,6 +6,7 @@ import com.abbas.cinebook.dto.ScreenRequestDTO;
 import com.abbas.cinebook.dto.ScreenResponseDTO;
 import com.abbas.cinebook.service.ScreenService;
 
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,10 @@ public class ScreenController {
     private final ScreenService screenService;
 
     @PostMapping
-    public ResponseEntity<ScreenResponseDTO> getMethodName(@RequestBody ScreenRequestDTO screenRequestDTO) {
+    public ResponseEntity<ScreenResponseDTO> getMethodName(
+        
+        @Valid 
+        @RequestBody ScreenRequestDTO screenRequestDTO) {
 
         ScreenResponseDTO response = 
                 screenService.createScreen(screenRequestDTO);

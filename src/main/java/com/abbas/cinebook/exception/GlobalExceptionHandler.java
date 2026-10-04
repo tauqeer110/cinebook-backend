@@ -1,11 +1,17 @@
 package com.abbas.cinebook.exception;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice 
 public class GlobalExceptionHandler {
@@ -44,5 +50,34 @@ public class GlobalExceptionHandler {
         );
 
         return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+    }
+
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationErrors(MethodArgumentNotValidException ex) {
+
+        Map<String, String> errors = new HashMap<>();
+
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+            errors.put(error.getField(), error.getDefaultMessage())
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+    }
+
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<List<String>> handleConstraintViolation(ConstraintViolationException ex) {
+
+        // Collect the custom message from every failed @PathVariable/@RequestParam,        // skipping Spring's default "methodName.paramName: message" extract message only as we must not expose method name
+        // skipping Spring's default "methodName.paramName:" prefix for each one
+
+        List<String> messages = ex.getConstraintViolations()
+            .stream()
+            .map(violation -> violation.getMessage())
+            .toList();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(messages);
+        
     }
 }

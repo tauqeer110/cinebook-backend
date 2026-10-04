@@ -6,6 +6,7 @@ import com.abbas.cinebook.dto.MovieRequestDTO;
 import com.abbas.cinebook.dto.MovieResponseDTO;
 import com.abbas.cinebook.service.MovieService;
 
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,10 @@ public class MovieController {
     private final MovieService movieService;
 
     @PostMapping
-    public ResponseEntity<MovieResponseDTO> createMovie(@RequestBody MovieRequestDTO movieRequestDTO) {
+    public ResponseEntity<MovieResponseDTO> createMovie(
+        
+        @Valid 
+        @RequestBody MovieRequestDTO movieRequestDTO) {
         
         MovieResponseDTO response = 
                 movieService.createMovie(movieRequestDTO);

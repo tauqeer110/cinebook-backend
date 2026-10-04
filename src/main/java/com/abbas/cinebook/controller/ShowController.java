@@ -10,12 +10,15 @@ import com.abbas.cinebook.dto.ShowResponseDTO;
 import com.abbas.cinebook.service.ShowPricingService;
 import com.abbas.cinebook.service.ShowService;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 
 @RestController 
+@Validated 
 @RequestMapping("/api/shows")
 @RequiredArgsConstructor 
 public class ShowController {
@@ -32,7 +36,10 @@ public class ShowController {
     private final ShowPricingService showPricingService;
     
     @PostMapping
-    public ResponseEntity<ShowResponseDTO> createShow(@RequestBody ShowDTO dto) {
+    public ResponseEntity<ShowResponseDTO> createShow(
+        
+        @Valid 
+        @RequestBody ShowDTO dto) {
 
         ShowResponseDTO response = 
                 showService.createShow(dto);
@@ -43,10 +50,16 @@ public class ShowController {
     }
 
     @PostMapping("/{showId}/pricing")
-    public ResponseEntity<List<ShowPricingResponseDTO>> setShowPrice(@PathVariable int showId, @RequestBody ShowPricingRequestDTO request) {
+    public ResponseEntity<List<ShowPricingResponseDTO>> setShowPrice(
+
+        @Positive(message = "Show id must be positive")
+        @PathVariable int showId, 
+
+        @Valid 
+        @RequestBody ShowPricingRequestDTO showPricingRequestDTO) {
       
         List<ShowPricingResponseDTO> response = 
-                showPricingService.setShowPrice(showId, request);
+                showPricingService.setShowPrice(showId, showPricingRequestDTO);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -64,8 +77,11 @@ public class ShowController {
                 .body(showResponseDTOs);
     }
 
-    @GetMapping("{showId}")
-    public ResponseEntity<ShowResponseDTO> getShows(@PathVariable  int showId) {
+    @GetMapping("/{showId}")
+    public ResponseEntity<ShowResponseDTO> getShow(
+
+        @Positive(message = "Show id must be positive")
+        @PathVariable  int showId) {
 
         ShowResponseDTO showResponseDTO = 
                 showService.getShow(showId);
