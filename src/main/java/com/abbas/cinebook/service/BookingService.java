@@ -12,15 +12,17 @@ import com.abbas.cinebook.entity.Booking;
 import com.abbas.cinebook.entity.BookingSeat;
 import com.abbas.cinebook.entity.Seat;
 import com.abbas.cinebook.entity.Show;
+import com.abbas.cinebook.entity.ShowSeat;
 import com.abbas.cinebook.entity.User;
 import com.abbas.cinebook.enums.BookingStatus;
+import com.abbas.cinebook.enums.SeatStatus;
 import com.abbas.cinebook.exception.BadRequestException;
 import com.abbas.cinebook.exception.ConflictException;
 import com.abbas.cinebook.exception.ResourceNotFoundException;
 import com.abbas.cinebook.repository.BookingRepository;
 import com.abbas.cinebook.repository.BookingSeatRepository;
-import com.abbas.cinebook.repository.SeatRepository;
 import com.abbas.cinebook.repository.ShowRepository;
+import com.abbas.cinebook.repository.ShowSeatRepository;
 import com.abbas.cinebook.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
@@ -34,9 +36,11 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final ShowRepository showRepository;
     private final UserRepository userRepository;
-    private final SeatRepository seatRepository;
+
     private final BookingSeatRepository bookingSeatRepository;
     private final PricingService pricingService;
+    private final ShowSeatRepository showSeatRepository;
+    
 
     public BookingResponseDTO getBooking(int bookingId) {
 
@@ -67,27 +71,42 @@ public class BookingService {
 
     public BookingResponseDTO cancelBooking(int bookingId) {
 
+        // 1. Fetch the booking
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking Does Not Exists"));
+                .orElseThrow(() -> new ResourceNotFoundException("Booking " + bookingId + " Does Not Exist"));
 
-        if(booking.getBookingStatus() == BookingStatus.CANCELLED) {
-                throw new ConflictException("Boking has Already Cancelled, Can't cancel Twice");
+        // 2. Prevent duplicate cancellations
+        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
+                throw new ConflictException("Booking has already been cancelled, cannot cancel twice");
         }
 
+        // 3. Update the booking status
         booking.setBookingStatus(BookingStatus.CANCELLED);
 
+        // 4. Fetch the seats linked to this booking
         List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(bookingId);
 
         double totalPrice = 0;
         List<String> seatNumbers = new ArrayList<>();
 
+        // 5. Release seats back to inventory
         for (BookingSeat bookingSeat : bookingSeats) {
 
-            totalPrice += bookingSeat.getPrice();
+                int showId = booking.getShow().getId();
+                int seatId = bookingSeat.getSeat().getId();
 
-            seatNumbers.add(bookingSeat.getSeat().getSeatNumber());
+                ShowSeat showSeat = showSeatRepository.findByShowIdAndSeatId(showId, seatId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Seat mapping not found for seat ID: " + bookingSeat.getSeat().getId()));
+
+                // Mark the seat as AVAILABLE again
+                showSeat.setSeatStatus(SeatStatus.AVAILABLE);
+
+                totalPrice += bookingSeat.getPrice();
+                seatNumbers.add(bookingSeat.getSeat().getSeatNumber());
+
         }
 
+        // 7. Return the response
         return createBookingResponse(
                 booking,
                 booking.getShow().getId(),
@@ -101,29 +120,26 @@ public class BookingService {
         Show show = getShow(dto.getShowId());
         User user = getUser(dto.getUserId());
 
-        List<Seat> seats = validateAndGetSeats(
-                dto.getSeatIds(),
-                show
-        );
+        List<Seat> seats = validateAndLockSeats(dto.getSeatIds(), show);
 
-        Booking booking = createBooking(show, user);
+        Booking booking = createNewBooking(show, user);
 
         double totalPrice = 0;
         List<String> seatNumbers = new ArrayList<>();
+        List<BookingSeat> bookingSeats = new ArrayList<>();
 
         for (Seat seat : seats) {
 
             double price = pricingService.calculatePrice(seat, show);
 
-            createBookingSeat(
-                    booking,
-                    seat,
-                    price
-            );
+            BookingSeat bookingSeat = createBookingSeat(booking, seat, price);
 
             totalPrice += price;
             seatNumbers.add(seat.getSeatNumber());
+            bookingSeats.add(bookingSeat);
         }
+
+        bookingSeatRepository.saveAll(bookingSeats);
 
         return createBookingResponse(
                 booking,
@@ -153,42 +169,35 @@ public class BookingService {
                 );
     }
 
-    private List<Seat> validateAndGetSeats(
-            List<Integer> seatIds,
-            Show show) {
+    private List<Seat> validateAndLockSeats(List<Integer> seatIds, Show show) {
 
         List<Seat> seats = new ArrayList<>();
 
         for (int seatId : seatIds) {
 
-            Seat seat = getSeat(seatId);
+                // 1. Fetch the ShowSeat record (which has @Version)
+                ShowSeat showSeat = showSeatRepository.findByShowIdAndSeatId(show.getId(), seatId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Seat " + seatId + " is not mapped to this show"));
 
-            validateSeatScreen(seat, show);
+                // 2. Validate screen match
+                validateSeatScreen(showSeat.getSeat(), show);
 
-            validateSeatAvailability(
-                    seatId,
-                    show
-            );
+                // 3. Check availability
+                if (showSeat.getSeatStatus() != SeatStatus.AVAILABLE) {
+                    throw new ConflictException("Seat " + showSeat.getSeat().getSeatNumber() + " is already booked");
+                }
+        
+                // 4. CRITICAL: Modify the entity so Hibernate triggers the version check on commit
+                showSeat.setSeatStatus(SeatStatus.BOOKED);
+                showSeatRepository.save(showSeat);
 
-            seats.add(seat);
+                seats.add(showSeat.getSeat());
         }
 
         return seats;
     }
 
-    private Seat getSeat(int seatId) {
-
-        return seatRepository.findById(seatId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Seat " + seatId + " Does Not Exist"
-                        )
-                );
-    }
-
-    private void validateSeatScreen(
-            Seat seat,
-            Show show) {
+    private void validateSeatScreen(Seat seat, Show show) {
 
         if (seat.getScreen().getId() != show.getScreen().getId()) {
 
@@ -199,28 +208,7 @@ public class BookingService {
         }
     }
 
-    private void validateSeatAvailability(
-            int seatId,
-            Show show) {
-
-        boolean isBooked =
-                bookingSeatRepository.existsBySeatIdAndBooking_ShowIdAndBooking_BookingStatus (
-                        seatId,
-                        show.getId(),
-                        BookingStatus.CONFIRMED
-                );
-
-        if (isBooked) {
-
-            throw new ConflictException(
-                    "Seat " + seatId + " Is Already Booked"
-            );
-        }
-    }
-
-    private Booking createBooking(
-            Show show,
-            User user) {
+    private Booking createNewBooking(Show show, User user) {
 
         Booking booking = new Booking();
 
@@ -232,7 +220,7 @@ public class BookingService {
         return bookingRepository.save(booking);
     }
 
-    private void createBookingSeat(
+    private BookingSeat createBookingSeat(
             Booking booking,
             Seat seat,
             double price) {
@@ -243,7 +231,7 @@ public class BookingService {
         bookingSeat.setSeat(seat);
         bookingSeat.setBooking(booking);
 
-        bookingSeatRepository.save(bookingSeat);
+        return bookingSeat;
     }
 
     private BookingResponseDTO createBookingResponse(

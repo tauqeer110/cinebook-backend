@@ -11,24 +11,35 @@ import com.abbas.cinebook.dto.ShowDTO;
 import com.abbas.cinebook.dto.ShowResponseDTO;
 import com.abbas.cinebook.entity.Movie;
 import com.abbas.cinebook.entity.Screen;
+import com.abbas.cinebook.entity.Seat;
 import com.abbas.cinebook.entity.Show;
 import com.abbas.cinebook.entity.ShowPricing;
+import com.abbas.cinebook.entity.ShowSeat;
+import com.abbas.cinebook.enums.SeatStatus;
+import com.abbas.cinebook.exception.BadRequestException;
 import com.abbas.cinebook.exception.ResourceNotFoundException;
 import com.abbas.cinebook.repository.MovieRepository;
 import com.abbas.cinebook.repository.ScreenRepository;
+import com.abbas.cinebook.repository.SeatRepository;
 import com.abbas.cinebook.repository.ShowPricingRepository;
 import com.abbas.cinebook.repository.ShowRepository;
+import com.abbas.cinebook.repository.ShowSeatRepository;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service 
 @RequiredArgsConstructor 
+@Transactional 
 public class ShowService {
     
     private final ShowRepository showRepository;
     private final MovieRepository movieRepository;
     private final ScreenRepository screenRepository;
     private final ShowPricingRepository showPricingRepository;
+    private final SeatRepository seatRepository;
+    private final ShowSeatRepository showSeatRepository;
+
 
     public ShowResponseDTO createShow(ShowDTO dto) {
 
@@ -39,16 +50,40 @@ public class ShowService {
         Screen screen = screenRepository.findById(dto.getScreenId())
                 .orElseThrow(() -> new ResourceNotFoundException("Screen not Found"));
 
+        // 1. Create and save the Show
         Show show = new Show();
         show.setShowTime(dto.getShowTime());
         show.setScreen(screen);
         show.setMovie(movie);
 
-        Show saved = showRepository.save(show);
-
-        ShowResponseDTO responseDTO = createResponseDTO(saved);
+        Show savedShow = showRepository.save(show);
         
-        return responseDTO;
+        // 2. Fetch all physical seats in this screen
+        List<Seat> screenSeats = seatRepository.findByScreenId(screen.getId());
+
+        if (screenSeats.isEmpty()) {
+            throw new BadRequestException("Cannot create show: Screen " + screen.getId() + " has no configured seats");
+        }
+
+
+        // 3. Generate ShowSeat records initialized to AVAILABLE
+        List<ShowSeat> showSeats = new ArrayList<>();
+
+        for (Seat seat : screenSeats) {
+
+            ShowSeat showSeat = new ShowSeat();
+
+            showSeat.setShow(savedShow);
+            showSeat.setSeat(seat);
+            showSeat.setSeatStatus(SeatStatus.AVAILABLE);
+            showSeats.add(showSeat);
+
+        }
+
+        // 4. Batch insert all inventory rows in one go
+        showSeatRepository.saveAll(showSeats); 
+        
+        return createResponseDTO(savedShow);
     }
 
     public List<ShowResponseDTO> getShows() {
