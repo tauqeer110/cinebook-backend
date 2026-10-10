@@ -14,7 +14,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -40,6 +39,4 @@ public class ShowSeat {
     @Column(name = "seat_status", nullable = false)
     private SeatStatus seatStatus;
 
-    @Version 
-    private int version;
 }

@@ -12,7 +12,6 @@ import com.abbas.cinebook.entity.Booking;
 import com.abbas.cinebook.entity.BookingSeat;
 import com.abbas.cinebook.entity.Seat;
 import com.abbas.cinebook.entity.Show;
-import com.abbas.cinebook.entity.ShowSeat;
 import com.abbas.cinebook.entity.User;
 import com.abbas.cinebook.enums.BookingStatus;
 import com.abbas.cinebook.enums.SeatStatus;
@@ -21,6 +20,7 @@ import com.abbas.cinebook.exception.ConflictException;
 import com.abbas.cinebook.exception.ResourceNotFoundException;
 import com.abbas.cinebook.repository.BookingRepository;
 import com.abbas.cinebook.repository.BookingSeatRepository;
+import com.abbas.cinebook.repository.SeatRepository;
 import com.abbas.cinebook.repository.ShowRepository;
 import com.abbas.cinebook.repository.ShowSeatRepository;
 import com.abbas.cinebook.repository.UserRepository;
@@ -40,6 +40,7 @@ public class BookingService {
     private final BookingSeatRepository bookingSeatRepository;
     private final PricingService pricingService;
     private final ShowSeatRepository showSeatRepository;
+    private final SeatRepository seatRepository;
     
 
     public BookingResponseDTO getBooking(int bookingId) {
@@ -88,22 +89,23 @@ public class BookingService {
 
         double totalPrice = 0;
         List<String> seatNumbers = new ArrayList<>();
+        List<Integer> seatIds = new ArrayList<>();
 
-        // 5. Release seats back to inventory
+
         for (BookingSeat bookingSeat : bookingSeats) {
-
-                int showId = booking.getShow().getId();
-                int seatId = bookingSeat.getSeat().getId();
-
-                ShowSeat showSeat = showSeatRepository.findByShowIdAndSeatId(showId, seatId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Seat mapping not found for seat ID: " + bookingSeat.getSeat().getId()));
-
-                // Mark the seat as AVAILABLE again
-                showSeat.setSeatStatus(SeatStatus.AVAILABLE);
-
-                totalPrice += bookingSeat.getPrice();
+                seatIds.add(bookingSeat.getSeat().getId());
                 seatNumbers.add(bookingSeat.getSeat().getSeatNumber());
+                totalPrice += bookingSeat.getPrice();
+        }
 
+        // 6. Bulk atomic release of seats back to AVAILABLE in a single SQL query
+        if (!seatIds.isEmpty()) {
+                showSeatRepository.updateSeatStatusConditionally(
+                        booking.getShow().getId(),
+                        seatIds,
+                        SeatStatus.BOOKED,
+                        SeatStatus.AVAILABLE
+                );
         }
 
         // 7. Return the response
@@ -120,8 +122,32 @@ public class BookingService {
         Show show = getShow(dto.getShowId());
         User user = getUser(dto.getUserId());
 
-        List<Seat> seats = validateAndLockSeats(dto.getSeatIds(), show);
+        // 1. Fetch physical seats to validate they belong to this screen and calculate price
+        List<Seat> seats = seatRepository.findAllById(dto.getSeatIds());
 
+        if (seats.size() != dto.getSeatIds().size()) {
+                throw new ResourceNotFoundException("One or more physical seats not found");
+        }
+
+        for (Seat seat : seats) {
+                validateSeatScreen(seat, show);
+        }
+
+        // 2. ATOMIC CONDITIONAL UPDATE: Attempt to reserve all seats at once
+        int updatedRows = showSeatRepository.updateSeatStatusConditionally(
+                show.getId(),
+                dto.getSeatIds(),
+                SeatStatus.AVAILABLE,
+                SeatStatus.BOOKED
+        );
+
+        // If even ONE seat was already taken, updatedRows will not match requested seat count
+        if (updatedRows != dto.getSeatIds().size()) {
+                // Rolling back automatically frees any seats updated in this query
+                throw new ConflictException("One or more selected seats are no longer available");
+        }
+
+        // 3. Create and persist booking records
         Booking booking = createNewBooking(show, user);
 
         double totalPrice = 0;
@@ -129,25 +155,19 @@ public class BookingService {
         List<BookingSeat> bookingSeats = new ArrayList<>();
 
         for (Seat seat : seats) {
-
-            double price = pricingService.calculatePrice(seat, show);
-
-            BookingSeat bookingSeat = createBookingSeat(booking, seat, price);
-
-            totalPrice += price;
-            seatNumbers.add(seat.getSeatNumber());
-            bookingSeats.add(bookingSeat);
+                
+                double price = pricingService.calculatePrice(seat, show);
+                bookingSeats.add(createBookingSeat(booking, seat, price));
+                totalPrice += price;
+                seatNumbers.add(seat.getSeatNumber());
         }
 
         bookingSeatRepository.saveAll(bookingSeats);
 
-        return createBookingResponse(
-                booking,
-                show.getId(),
-                totalPrice,
-                seatNumbers
-        );
+        return createBookingResponse(booking, show.getId(), totalPrice, seatNumbers);
+
     }
+
 
     private Show getShow(int showId) {
 
@@ -169,33 +189,6 @@ public class BookingService {
                 );
     }
 
-    private List<Seat> validateAndLockSeats(List<Integer> seatIds, Show show) {
-
-        List<Seat> seats = new ArrayList<>();
-
-        for (int seatId : seatIds) {
-
-                // 1. Fetch the ShowSeat record (which has @Version)
-                ShowSeat showSeat = showSeatRepository.findByShowIdAndSeatId(show.getId(), seatId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Seat " + seatId + " is not mapped to this show"));
-
-                // 2. Validate screen match
-                validateSeatScreen(showSeat.getSeat(), show);
-
-                // 3. Check availability
-                if (showSeat.getSeatStatus() != SeatStatus.AVAILABLE) {
-                    throw new ConflictException("Seat " + showSeat.getSeat().getSeatNumber() + " is already booked");
-                }
-        
-                // 4. CRITICAL: Modify the entity so Hibernate triggers the version check on commit
-                showSeat.setSeatStatus(SeatStatus.BOOKED);
-                showSeatRepository.save(showSeat);
-
-                seats.add(showSeat.getSeat());
-        }
-
-        return seats;
-    }
 
     private void validateSeatScreen(Seat seat, Show show) {
 
